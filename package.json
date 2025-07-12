@@ -1,0 +1,9 @@
+
+{
+  "name": "threads-token-logger",
+  "version": "1.0.0",
+  "dependencies": {
+    "node-fetch": "^2.6.9",
+    "googleapis": "^132.0.0"
+  }
+}

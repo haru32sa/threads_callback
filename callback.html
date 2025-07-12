@@ -1,28 +1,31 @@
-<!-- callback.html -->
+
 <!DOCTYPE html>
 <html>
-  <head><title>認証完了</title></head>
-  <body>
-    <p>認証処理中です…</p>
-    <script>
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      if (code) {
-        fetch("/.netlify/functions/exchange_token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code })
-        })
-        .then(res => res.json())
-        .then(data => {
-          document.body.innerHTML = "<h2>認証完了！</h2><pre>" + JSON.stringify(data, null, 2) + "</pre>";
-        })
-        .catch(err => {
-          document.body.innerHTML = "<h2>エラー発生</h2><pre>" + err + "</pre>";
-        });
-      } else {
-        document.body.innerHTML = "<h2>codeが見つかりません</h2>";
-      }
-    </script>
-  </body>
+<head>
+  <title>Threads OAuth Callback</title>
+</head>
+<body>
+  <h2>認証処理を完了中です…</h2>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+
+    if (code) {
+      fetch("/.netlify/functions/exchange_token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.body.innerHTML += "<pre>✅ トークン取得成功！\n" + JSON.stringify(data, null, 2) + "</pre>";
+      })
+      .catch(err => {
+        document.body.innerHTML += "<pre>❌ エラー：\n" + err.message + "</pre>";
+      });
+    } else {
+      document.body.innerHTML += "<p>❌ codeが見つかりませんでした。</p>";
+    }
+  </script>
+</body>
 </html>
