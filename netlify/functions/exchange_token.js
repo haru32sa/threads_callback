@@ -10,7 +10,7 @@ exports.handler = async (event) => {
   console.log('client_id:', client_id);
   console.log('client_secret:', client_secret);
   console.log('redirect_uri:', redirect_uri);
-  console.log('code:', code);
+  console.log("📩 認証コード（code）:", code); // ★ここが超重要
 
   if (!client_id || !client_secret || !redirect_uri) {
     return {
