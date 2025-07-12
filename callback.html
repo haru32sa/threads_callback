@@ -21,7 +21,7 @@
 
       result.textContent = "✅ トークン取得処理中…";
 
-      const res = await fetch("/.netlify/functions/exchange_token", {
+      const res = await fetch("https://gregarious-selkie-d66d75.netlify.app/.netlify/functions/exchange_token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
