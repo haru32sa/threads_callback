@@ -1,30 +1,54 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <title>Threads OAuth Callback</title>
+  <meta charset="UTF-8" />
+  <title>Threads 認証処理中</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f7f7f7;
+      color: #333;
+    }
+    pre {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+  </style>
 </head>
 <body>
   <h2>認証処理を完了中です…</h2>
+  <p>このまま閉じずにお待ちください。</p>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
-    if (code) {
-      fetch("/.netlify/functions/exchange_token", {
+    if (!code) {
+      document.body.innerHTML += "<p>❌ 認証コードが取得できませんでした。</p>";
+    } else {
+      const backendUrl = "https://gregarious-selkie-d66d75.netlify.app/.netlify/functions/exchange_token";
+
+      fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code })
       })
-      .then(res => res.json())
-      .then(data => {
-        document.body.innerHTML += "<pre>✅ トークン取得成功！\n" + JSON.stringify(data, null, 2) + "</pre>";
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok) {
+          document.body.innerHTML += "<pre>✅ トークン取得成功！\n" + JSON.stringify(data, null, 2) + "</pre>";
+        } else {
+          document.body.innerHTML += "<pre>❌ エラー（" + res.status + "）:\n" + JSON.stringify(data, null, 2) + "</pre>";
+        }
+        console.log("[DEBUG] レスポンス:", data);
       })
-      .catch(err => {
-        document.body.innerHTML += "<pre>❌ エラー：\n" + err.message + "</pre>";
+      .catch((err) => {
+        document.body.innerHTML += "<pre>❌ 通信エラー:\n" + err.message + "</pre>";
+        console.error("[ERROR]", err);
       });
-    } else {
-      document.body.innerHTML += "<p>❌ codeが見つかりませんでした。</p>";
     }
   </script>
 </body>
