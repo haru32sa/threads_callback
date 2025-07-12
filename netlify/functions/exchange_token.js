@@ -3,35 +3,48 @@ const fetch = require('node-fetch');
 exports.handler = async (event) => {
   const client_id = process.env.CLIENT_ID;
   const client_secret = process.env.CLIENT_SECRET;
-  // ★修正箇所: 環境変数から取得したREDIRECT_URIを使用
-  // このREDIRECT_URIはMeta Developer Consoleに登録されているものと一致する必要があります
-  const redirect_uri = process.env.REDIRECT_URI;
-  
+  const redirect_uri = process.env.REDIRECT_URI; // これはトークン交換用のURIです
+  const log_function_url = process.env.LOG_FUNCTION_URL;
+
   let code;
-  // `callback.html`からPOSTされるJSONボディから`code`を取得
+
+  // ★修正箇所: まずPOSTボディからコードを試みる
   if (event.httpMethod === 'POST' && event.body) {
     try {
       const body = JSON.parse(event.body);
       code = body.code;
+      console.log('Code obtained from POST body.');
     } catch (e) {
-      console.error('Error parsing request body for code:', e);
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Invalid JSON body or missing code in body.' }),
-      };
+      console.error('Error parsing POST request body:', e);
+      // POSTボディのパースが予期せず失敗した場合のフォールバック
+      code = event.queryStringParameters?.code;
+      if (code) {
+          console.warn('Code obtained from query string after POST body parse failure.');
+      }
     }
+  } else if (event.httpMethod === 'GET') { // ★GETリクエストの場合、クエリ文字列からコードを取得
+    code = event.queryStringParameters?.code;
+    console.log('Code obtained from GET query string.');
   } else {
-      // 想定外のメソッドまたはボディ形式の場合のエラーハンドリング
-      console.error('Unsupported HTTP Method or missing body for code acquisition.');
+    console.error('Unsupported HTTP Method or missing body for code acquisition.');
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: 'Bad Request: Expected GET (initial redirect) or POST (from callback.html).' }),
+    };
+  }
+
+  // もしコードがまだ取得できていない場合
+  if (!code) {
+      console.error('認証コード（code）が取得できませんでした。');
       return {
           statusCode: 400,
-          body: JSON.stringify({ error: 'Bad Request: Expected POST with JSON body.' }),
+          body: JSON.stringify({ error: 'Missing authorization code.' }),
       };
   }
 
   console.log('client_id:', client_id ? '設定済み' : '未設定');
   console.log('client_secret:', client_secret ? '設定済み' : '未設定');
-  console.log('redirect_uri (from env):', redirect_uri); // 環境変数からのredirect_uriをログ出力
+  console.log('redirect_uri (from env, for token exchange):', redirect_uri);
   console.log("📩 認証コード（code）:", code);
 
   if (!client_id || !client_secret || !redirect_uri) {
@@ -42,30 +55,27 @@ exports.handler = async (event) => {
     };
   }
 
-  // ★修正箇所: Threads APIの正しいトークンエンドポイントに更新
+  // Threads APIの正しいトークンエンドポイント
   const token_url = 'https://graph.threads.net/oauth/access_token'; 
 
   const params = new URLSearchParams();
   params.append('client_id', client_id);
   params.append('client_secret', client_secret);
   params.append('grant_type', 'authorization_code');
-  params.append('redirect_uri', redirect_uri); // ★環境変数から取得した正しいREDIRECT_URIを使用
+  params.append('redirect_uri', redirect_uri); // 環境変数から取得した正しいREDIRECT_URIを使用
   params.append('code', code);
 
   try {
     const response = await fetch(token_url, {
       method: 'POST',
       body: params,
-      // Threads APIのドキュメントに明示されていない限り、Content-Typeは通常不要
-      // -F オプション (curl) は multipart/form-data または application/x-www-form-urlencoded を意味しますが
-      // node-fetchのURLSearchParamsは自動的に application/x-www-form-urlencoded を設定します。
     });
 
     const data = await response.json();
 
     console.log('Token response:', data);
 
-    if (data.access_token) {
+    if (response.ok && data.access_token) { // response.okも確認する
       const log_function_url = process.env.LOG_FUNCTION_URL;
       if (log_function_url) {
         try {
@@ -75,9 +85,9 @@ exports.handler = async (event) => {
             body: JSON.stringify({
               code: code,
               short_token: data.access_token,
-              long_token: data.long_lived_token || null, // Threads APIがlong_lived_tokenを返すか確認
+              long_token: data.long_lived_token || null,
               expires_in: data.expires_in,
-              user_id: data.user_id, // Threads APIはuser_idも返す
+              user_id: data.user_id,
             }),
           });
           console.log('Token data sent to log_token function successfully.');
@@ -95,7 +105,7 @@ exports.handler = async (event) => {
     } else {
       console.error('トークン取得失敗:', data);
       return {
-        statusCode: data.code || 500,
+        statusCode: response.status || 500, // HTTPステータスコードを優先
         body: JSON.stringify(data),
       };
     }
